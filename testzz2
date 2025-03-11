@@ -1,0 +1,177 @@
+
+
+idTxt
+nameTxt
+usernameTxt
+ageTxt
+
+dgvUsers
+
+using System;
+using System.Data;
+using System.Windows.Forms;
+using MySql.Data.MySqlClient;
+
+public static class Connection
+{
+    public static MySqlConnection conn;
+    public static MySqlCommand cmd;
+    public static MySqlDataReader reader;
+
+    public static void OnLoad(DataGridView dgvUsers)
+    {
+        GetAllData(dgvUsers);
+    }
+
+    public static void ConnectDB()
+    {
+        try
+        {
+            conn = new MySqlConnection("server=localhost;user=root;password=;database=sampledb");
+            conn.Open();
+            MessageBox.Show("Connected to Database", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Database Connection Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    public static void Insert(TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
+    {
+        try
+        {
+            ConnectDB();
+            string query = "INSERT INTO users(name, username, age) VALUES(@name, @username, @age)";
+            cmd = new MySqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@name", nameTxt.Text);
+            cmd.Parameters.AddWithValue("@username", usernameTxt.Text);
+            cmd.Parameters.AddWithValue("@age", ageTxt.Text);
+            cmd.ExecuteNonQuery();
+
+            MessageBox.Show("User was added", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            conn.Close();
+            GetAllData(dgvUsers);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    public static void GetAllData(DataGridView dgvUsers)
+    {
+        try
+        {
+            ConnectDB();
+            string query = "SELECT * FROM users";
+            cmd = new MySqlCommand(query, conn);
+            reader = cmd.ExecuteReader();
+            DataTable dt = new DataTable();
+            dt.Load(reader);
+            dgvUsers.DataSource = dt;
+
+            conn.Close();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    public static void ShowUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(idTxt.Text))
+            {
+                MessageBox.Show("Please enter a valid ID.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            ConnectDB();
+            string query = "SELECT * FROM users WHERE id = @id";
+            cmd = new MySqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@id", idTxt.Text);
+            reader = cmd.ExecuteReader();
+
+            if (reader.Read())
+            {
+                nameTxt.Text = reader["name"].ToString();
+                usernameTxt.Text = reader["username"].ToString();
+                ageTxt.Text = reader["age"].ToString();
+            }
+            else
+            {
+                MessageBox.Show("User ID does not exist", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            reader.Close();
+            conn.Close();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    public static void DeleteUser(TextBox idTxt, DataGridView dgvUsers)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(idTxt.Text))
+            {
+                MessageBox.Show("Please enter a valid ID.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            DialogResult result = MessageBox.Show("Are you sure?", "Confirm Deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (result == DialogResult.Yes)
+            {
+                ConnectDB();
+                string query = "DELETE FROM users WHERE id = @id";
+                cmd = new MySqlCommand(query, conn);
+                cmd.Parameters.AddWithValue("@id", idTxt.Text);
+                cmd.ExecuteNonQuery();
+
+                MessageBox.Show("User was deleted.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                conn.Close();
+                GetAllData(dgvUsers);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    public static void UpdateUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(idTxt.Text))
+            {
+                MessageBox.Show("Please enter a valid ID.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            ConnectDB();
+            string query = "UPDATE users SET name = @name, username = @username, age = @age WHERE id = @id";
+            cmd = new MySqlCommand(query, conn);
+            cmd.Parameters.AddWithValue("@id", idTxt.Text);
+            cmd.Parameters.AddWithValue("@name", nameTxt.Text);
+            cmd.Parameters.AddWithValue("@username", usernameTxt.Text);
+            cmd.Parameters.AddWithValue("@age", ageTxt.Text);
+            cmd.ExecuteNonQuery();
+
+            MessageBox.Show("User was updated.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            conn.Close();
+            GetAllData(dgvUsers);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+}
