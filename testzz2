@@ -7,29 +7,41 @@ ageTxt
 
 dgvUsers
 
+// accessing DatabaseConnection
+
+private DatabaseConnection db;
+
+private void Form1_Load(object sender, EventArgs e)
+{
+    db = new DatabaseConnection();
+    db.GetAllData(dgvUsers);
+}
+
 using System;
 using System.Data;
 using System.Windows.Forms;
 using MySql.Data.MySqlClient;
 
-public static class Connection
+public class DatabaseConnection
 {
-    public static MySqlConnection conn;
-    public static MySqlCommand cmd;
-    public static MySqlDataReader reader;
+    private MySqlConnection conn;
+    private MySqlCommand cmd;
+    private MySqlDataReader reader;
 
-    public static void OnLoad(DataGridView dgvUsers)
+    public DatabaseConnection()
     {
-        GetAllData(dgvUsers);
+        conn = new MySqlConnection("server=localhost;user=root;password=;database=sampledb");
     }
 
-    public static void ConnectDB()
+    public void ConnectDB()
     {
         try
         {
-            conn = new MySqlConnection("server=localhost;user=root;password=;database=sampledb");
-            conn.Open();
-            MessageBox.Show("Connected to Database", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (conn.State == ConnectionState.Closed)
+            {
+                conn.Open();
+                MessageBox.Show("Connected to Database", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
         catch (Exception ex)
         {
@@ -37,7 +49,7 @@ public static class Connection
         }
     }
 
-    public static void Insert(TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
+    public void Insert(TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
     {
         try
         {
@@ -59,7 +71,7 @@ public static class Connection
         }
     }
 
-    public static void GetAllData(DataGridView dgvUsers)
+    public void GetAllData(DataGridView dgvUsers)
     {
         try
         {
@@ -79,7 +91,7 @@ public static class Connection
         }
     }
 
-    public static void ShowUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt)
+    public void ShowUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt)
     {
         try
         {
@@ -115,7 +127,7 @@ public static class Connection
         }
     }
 
-    public static void DeleteUser(TextBox idTxt, DataGridView dgvUsers)
+    public void DeleteUser(TextBox idTxt, DataGridView dgvUsers)
     {
         try
         {
@@ -146,7 +158,7 @@ public static class Connection
         }
     }
 
-    public static void UpdateUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
+    public void UpdateUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
     {
         try
         {
