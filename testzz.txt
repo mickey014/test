@@ -15,8 +15,10 @@ Module MySQLConn
 
     Public Sub ConnectDB()
         Try
-            conn = New MySqlConnection("server=localhost;user=root;password=yourpassword;database=sample_db")
-            conn.Open()
+	   conn = New MySqlConnection("server=localhost;user=root;password=yourpassword;database=sample_db")
+	   If conn.State = ConnectionState.Closed Then
+                conn.Open()
+            End If
         Catch ex As Exception
             MsgBox("Database Connection Error: " & ex.Message)
         End Try
