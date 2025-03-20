@@ -93,6 +93,121 @@ namespace EmployeeManagement
             get_all_user();
         }
 
+        private void dgvUsers_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                DataGridViewRow selectedRow = dgvUsers.Rows[e.RowIndex];
+        
+                if (selectedRow.Cells["colId"].Value != null)
+                {
+                    id = selectedRow.Cells["colId"].Value.ToString();
+                    txtName.Text = selectedRow.Cells["colName"].Value.ToString();
+                    txtUsername.Text = selectedRow.Cells["colUsername"].Value.ToString();
+                    txtEmail.Text = selectedRow.Cells["colEmail"].Value.ToString();
+                    txtAge.Text = selectedRow.Cells["colAge"].Value.ToString();
+                    txtPassword.Text = selectedRow.Cells["colPassword"].Value.ToString();
+                }
+            }
+        
+            if (e.ColumnIndex >= 0)
+            {
+                string columnName = dgvUsers.Columns[e.ColumnIndex].Name;
+                if (columnName == "colEducational")
+                {
+                    MessageBox.Show("education");
+                }
+            }
+        }
+
+        private void searchBtn_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(txtSearch.Text))
+            {
+                get_all_user();
+                return;
+            }
+        
+            try
+            {
+                Database.db_connect();
+                dgvUsers.Rows.Clear();
+        
+                string query = "SELECT * FROM users WHERE id LIKE @id OR username LIKE @username";
+                Database.cmd = new SqlCommand(query, Database.conn);
+                Database.cmd.Parameters.AddWithValue("@id", txtSearch.Text);
+                Database.cmd.Parameters.AddWithValue("@username", "%" + txtSearch.Text + "%");
+        
+                Database.reader = Database.cmd.ExecuteReader();
+        
+                while (Database.reader.Read())
+                {
+                    dgvUsers.Rows.Add(reader["id"].ToString(),
+                                      reader["name"].ToString(),
+                                      reader["username"].ToString(),
+                                      reader["email"].ToString(),
+                                      reader["age"].ToString(),
+                                      reader["password"].ToString());
+                }
+        
+                Database.reader.Close();
+                //Database.cmd.Dispose(); // Dispose the command object
+                Database.conn.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
+        private void updateBtn_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                MessageBox.Show("User ID is invalid.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+        
+            if (string.IsNullOrEmpty(txtName.Text) || string.IsNullOrEmpty(txtUsername.Text) ||
+                string.IsNullOrEmpty(txtEmail.Text) || string.IsNullOrEmpty(txtAge.Text) ||
+                string.IsNullOrEmpty(txtPassword.Text))
+            {
+                MessageBox.Show("All fields are required!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            else if (!int.TryParse(txtAge.Text, out _))
+            {
+                MessageBox.Show("Age is invalid!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+        
+            try
+            {
+                Database.db_connect();
+                string query = "UPDATE users SET name=@name, username=@username, email=@email, age=@age, password=@password WHERE id=@id";
+                Database.cmd = new SqlCommand(query, Database.conn);
+                Database.cmd.Parameters.AddWithValue("@name", txtName.Text);
+                Database.cmd.Parameters.AddWithValue("@username", txtUsername.Text);
+                Database.cmd.Parameters.AddWithValue("@email", txtEmail.Text);
+                Database.cmd.Parameters.AddWithValue("@age", txtAge.Text);
+                Database.cmd.Parameters.AddWithValue("@password", txtPassword.Text);
+                Database.cmd.Parameters.AddWithValue("@id", id);
+        
+                Database.cmd.ExecuteNonQuery();
+                //Database.cmd.Dispose(); // Manually disposing to free resources
+        
+                MessageBox.Show("User was updated.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Database.conn.Close();
+                Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+
         private void saveBtn_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(txtName.Text) || string.IsNullOrEmpty(txtUsername.Text) ||
@@ -163,6 +278,26 @@ namespace EmployeeManagement
                 MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private void logout_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            DialogResult result = MessageBox.Show("Are you sure you want to logout?", "Message", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        
+            if (result == DialogResult.No)
+            {
+                return;
+            }
+        
+            this.Hide();
+            loginForm.Show();
+        }
+
+        private void showPass_CheckedChanged(object sender, EventArgs e)
+        {
+            txtPassword.PasswordChar = showPass.Checked ? '\0' : '*';
+        }
+
+
     }
 }
 
