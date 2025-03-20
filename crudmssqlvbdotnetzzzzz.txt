@@ -1,0 +1,377 @@
+Imports System.Data.SqlClient
+Module Database
+
+    Public conn As SqlConnection
+    Public cmd As SqlCommand
+    Public reader As SqlDataReader
+
+    Public Sub db_connect()
+        Try
+            conn = New SqlConnection("Server=DESKTOP-B7PU5R3\SQLEXPRESS;Database=employee;Trusted_Connection=True;")
+            If conn.State = ConnectionState.Closed Then
+                conn.Open()
+            End If
+        Catch ex As Exception
+            MsgBox("Database Connection Error: " & ex.Message)
+        End Try
+    End Sub
+End Module
+
+--- dashboard --
+Imports System.Data.SqlClient
+Public Class Form1
+
+    Dim id As String
+    Dim transaction As SqlTransaction = Nothing
+
+
+    Private Sub Clear()
+        id = ""
+        txtName.Clear()
+        txtUsername.Clear()
+        txtEmail.Clear()
+        txtAge.Clear()
+        txtPassword.Clear()
+        txtSearch.Clear()
+        get_all_user()
+    End Sub
+
+
+    Private Sub get_all_user()
+        Try
+            db_connect()
+
+            dgvUsers.Rows.Clear()
+
+            Dim query As String = "SELECT * FROM users;"
+            cmd = New SqlCommand(query, conn)
+            reader = cmd.ExecuteReader()
+
+            While reader.Read()
+                dgvUsers.Rows.Add(reader("id").ToString(),
+                                  reader("name").ToString(),
+                                  reader("username").ToString(),
+                                  reader("email").ToString(),
+                                  reader("age").ToString(),
+                                  reader("password").ToString())
+            End While
+
+            reader.Close()
+            conn.Close()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message, MsgBoxStyle.Critical)
+        End Try
+
+    End Sub
+    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        get_all_user()
+    End Sub
+
+    Private Sub saveBtn_Click(sender As Object, e As EventArgs) Handles saveBtn.Click
+
+        If (String.IsNullOrEmpty(txtName.Text) Or
+            String.IsNullOrEmpty(txtUsername.Text) Or
+            String.IsNullOrEmpty(txtEmail.Text) Or
+            String.IsNullOrEmpty(txtAge.Text) Or
+            String.IsNullOrEmpty(txtPassword.Text)) Then
+            MessageBox.Show("All fields are required!", "Information",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        ElseIf Not IsNumeric(txtAge.Text) Then
+            MessageBox.Show("Age is invalid!", "Information",
+                           MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+
+        Try
+            db_connect()
+
+            transaction = conn.BeginTransaction()
+
+            Dim query As String = "INSERT INTO users (name, username, email, age, password) 
+                                    VALUES (@name, @username, @email, @age, @password);
+                                    SELECT SCOPE_IDENTITY();"
+            cmd = New SqlCommand(query, conn, transaction)
+            cmd.Parameters.AddWithValue("@name", txtName.Text)
+            cmd.Parameters.AddWithValue("@username", txtUsername.Text)
+            cmd.Parameters.AddWithValue("@email", txtEmail.Text)
+            cmd.Parameters.AddWithValue("@age", txtAge.Text)
+            cmd.Parameters.AddWithValue("@password", txtPassword.Text)
+
+            transaction.Commit()
+
+            MsgBox("User was added.")
+            conn.Close()
+            Clear()
+        Catch ex As Exception
+            transaction.Rollback()
+            MsgBox("Error: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub updateBtn_Click(sender As Object, e As EventArgs) Handles updateBtn.Click
+
+        If String.IsNullOrEmpty(id) Then
+            MsgBox("User id is invalid.")
+            Return
+        End If
+
+        If (String.IsNullOrEmpty(txtName.Text) Or
+            String.IsNullOrEmpty(txtUsername.Text) Or
+            String.IsNullOrEmpty(txtEmail.Text) Or
+            String.IsNullOrEmpty(txtAge.Text) Or
+            String.IsNullOrEmpty(txtPassword.Text)) Then
+            MessageBox.Show("All fields are required!", "Information",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        ElseIf Not IsNumeric(txtAge.Text) Then
+            MessageBox.Show("Age is invalid!", "Information",
+                           MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Try
+            db_connect()
+            Dim query As String = "UPDATE users SET name=@name, username=@username, email=@email, 
+                                    age=@age, password=@password WHERE id=@id"
+            cmd = New SqlCommand(query, conn)
+            cmd.Parameters.AddWithValue("@name", txtName.Text)
+            cmd.Parameters.AddWithValue("@username", txtUsername.Text)
+            cmd.Parameters.AddWithValue("@email", txtEmail.Text)
+            cmd.Parameters.AddWithValue("@age", txtAge.Text)
+            cmd.Parameters.AddWithValue("@password", txtPassword.Text)
+            cmd.Parameters.AddWithValue("@id", id)
+
+            cmd.ExecuteNonQuery()
+            MsgBox("User was updated.")
+            conn.Close()
+            Clear()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub deleteBtn_Click(sender As Object, e As EventArgs) Handles deleteBtn.Click
+        If String.IsNullOrEmpty(id) Then
+            MsgBox("User id is invalid.")
+            Return
+        End If
+
+        Dim result As DialogResult = MessageBox.Show("Are you sure you want to delete this user?", "Confirm Deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+
+        If result = DialogResult.No Then
+            Return
+        End If
+
+        Try
+            db_connect()
+            Dim query As String = "DELETE FROM users WHERE id=@id"
+            cmd = New SqlCommand(query, conn)
+            cmd.Parameters.AddWithValue("@id", id)
+            cmd.ExecuteNonQuery()
+            MsgBox("User was deleted.")
+            conn.Close()
+            Clear()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub clearBtn_Click(sender As Object, e As EventArgs) Handles clearBtn.Click
+        Clear()
+    End Sub
+
+    Private Sub searchBtn_Click(sender As Object, e As EventArgs) Handles searchBtn.Click
+        If String.IsNullOrEmpty(txtSearch.Text) Then
+            get_all_user()
+            Return
+        End If
+
+        Try
+
+            db_connect()
+
+            dgvUsers.Rows.Clear()
+
+            Dim query As String = "SELECT * FROM users WHERE id LIKE @id or username like @username"
+            cmd = New SqlCommand(query, conn)
+            cmd.Parameters.AddWithValue("@id", txtSearch.Text)
+            cmd.Parameters.AddWithValue("@username", "%" & txtSearch.Text & "%")
+            reader = cmd.ExecuteReader()
+
+            While reader.Read()
+                dgvUsers.Rows.Add(reader("id").ToString(),
+                                  reader("name").ToString(),
+                                  reader("username").ToString(),
+                                  reader("email").ToString(),
+                                  reader("age").ToString(),
+                                  reader("password").ToString())
+            End While
+
+            reader.Close()
+            conn.Close()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub logout_LinkClicked(sender As Object, e As LinkLabelLinkClickedEventArgs) Handles logout.LinkClicked
+        Dim result As DialogResult = MessageBox.Show("Are you sure you want to logout?", "Message", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+
+        If result = DialogResult.No Then
+            Return
+        End If
+
+        Me.Hide()
+        loginForm.Show()
+    End Sub
+
+    Private Sub showPass_CheckedChanged(sender As Object, e As EventArgs) Handles showPass.CheckedChanged
+        If showPass.Checked Then
+            txtPassword.PasswordChar = ""
+        Else
+            txtPassword.PasswordChar = "*"
+        End If
+    End Sub
+
+    Private Sub dgvUsers_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvUsers.CellContentClick
+        If e.RowIndex >= 0 Then
+            Dim selectedRow As DataGridViewRow = dgvUsers.Rows(e.RowIndex)
+
+            If selectedRow.Cells("colId").Value IsNot Nothing Then
+                id = selectedRow.Cells("colId").Value.ToString()
+                txtName.Text = selectedRow.Cells("colName").Value.ToString()
+                txtUsername.Text = selectedRow.Cells("colUsername").Value.ToString()
+                txtEmail.Text = selectedRow.Cells("colEmail").Value.ToString()
+                txtAge.Text = selectedRow.Cells("colAge").Value.ToString()
+                txtPassword.Text = selectedRow.Cells("colPassword").Value.ToString()
+            End If
+        End If
+
+        If e.ColumnIndex >= 0 Then
+            Dim columnName As String = dgvUsers.Columns(e.ColumnIndex).Name
+            If columnName = "colEducational" Then
+                MessageBox.Show("education")
+            End If
+        End If
+    End Sub
+End Class
+
+
+-- Login --
+Imports System.Data.SqlClient
+
+Public Class loginForm
+    Private Sub signinBtn_Click(sender As Object, e As EventArgs) Handles signinBtn.Click
+        If (String.IsNullOrEmpty(signinUsername.Text) Or String.IsNullOrEmpty(signinPassword.Text)) Then
+            MessageBox.Show("All fields are required!", "Information",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Try
+            db_connect()
+            Dim query As String = "select username, password from users where 
+                                    username = @username and password = @password"
+            cmd = New SqlCommand(query, conn)
+            cmd.Parameters.AddWithValue("@username", signinUsername.Text)
+            cmd.Parameters.AddWithValue("@password", signinPassword.Text)
+            reader = cmd.ExecuteReader()
+
+            If reader.HasRows Then
+                MsgBox("Login successful")
+                Form1.Show()
+                Me.Hide()
+                Form1.sessionUsername.Text = signinUsername.Text
+                clear()
+            Else
+                MsgBox("Invalid username or password")
+            End If
+
+            reader.Close()
+            conn.Close()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message)
+        End Try
+    End Sub
+
+    Public Sub clear()
+        signinUsername.Clear()
+        signinPassword.Clear()
+    End Sub
+
+    Private Sub loginForm_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+    End Sub
+
+    Private Sub LinkLabel1_LinkClicked(sender As Object, e As LinkLabelLinkClickedEventArgs) Handles LinkLabel1.LinkClicked
+        Me.Hide()
+        registerForm.Show()
+
+    End Sub
+
+    Private Sub showPass_CheckedChanged(sender As Object, e As EventArgs) Handles showPass.CheckedChanged
+        If showPass.Checked Then
+            signinPassword.PasswordChar = ""
+        Else
+            signinPassword.PasswordChar = "*"
+        End If
+    End Sub
+End Class
+
+-- Register --
+Imports System.Data.SqlClient
+
+Public Class registerForm
+    Private Sub LinkLabel1_LinkClicked(sender As Object, e As LinkLabelLinkClickedEventArgs) Handles LinkLabel1.LinkClicked
+        Me.Hide()
+        loginForm.Show()
+    End Sub
+
+    Private Sub signupBtn_Click(sender As Object, e As EventArgs) Handles signupBtn.Click
+        If (String.IsNullOrEmpty(signupUsername.Text) Or
+            String.IsNullOrEmpty(signupPassword.Text) Or
+            String.IsNullOrEmpty(signupCPassword.Text)) Then
+            MessageBox.Show("All fields are required!", "Information",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        ElseIf signupPassword.Text <> signupCPassword.Text Then
+            MessageBox.Show("Passwords do not match. Please try again.", "Information",
+                           MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Try
+            db_connect()
+            Dim query As String = "INSERT INTO users (username, password) 
+                                    VALUES (@username, @password)"
+            cmd = New SqlCommand(query, conn)
+            cmd.Parameters.AddWithValue("@username", signupUsername.Text)
+            cmd.Parameters.AddWithValue("@password", signupPassword.Text)
+            cmd.ExecuteNonQuery()
+            MsgBox("User was added.")
+            conn.Close()
+            clear()
+        Catch ex As Exception
+            MsgBox("Error: " & ex.Message)
+        End Try
+    End Sub
+
+    Public Sub clear()
+        signupUsername.Clear()
+        signupPassword.Clear()
+        signupCPassword.Clear()
+
+    End Sub
+
+    Private Sub showPass_CheckedChanged(sender As Object, e As EventArgs) Handles showPass.CheckedChanged
+        If showPass.Checked Then
+            signupPassword.PasswordChar = ""
+            signupCPassword.PasswordChar = ""
+        Else
+            signupPassword.PasswordChar = "*"
+            signupCPassword.PasswordChar = "*"
+        End If
+    End Sub
+End Class
