@@ -1,46 +1,23 @@
-
-
-idTxt
-nameTxt
-usernameTxt
-ageTxt
-
-dgvUsers
-
-// accessing DatabaseConnection
-
-private DatabaseConnection db;
-
-private void Form1_Load(object sender, EventArgs e)
-{
-    db = new DatabaseConnection();
-    db.GetAllData(dgvUsers);
-}
-
+-- Database Connection --
 using System;
 using System.Data;
+using System.Data.SqlClient;
 using System.Windows.Forms;
-using MySql.Data.MySqlClient;
 
-public class DatabaseConnection
+public static class Database
 {
-    private MySqlConnection conn;
-    private MySqlCommand cmd;
-    private MySqlDataReader reader;
+    public static SqlConnection conn;
+    public static SqlCommand cmd;
+    public static SqlDataReader reader;
 
-    public DatabaseConnection()
-    {
-        conn = new MySqlConnection("server=localhost;user=root;password=;database=sampledb");
-    }
-
-    public void ConnectDB()
+    public static void db_connect()
     {
         try
         {
+            conn = new SqlConnection(@"Server=DESKTOP-B7PU5R3\SQLEXPRESS;Database=employee;Trusted_Connection=True;");
             if (conn.State == ConnectionState.Closed)
             {
                 conn.Open();
-                MessageBox.Show("Connected to Database", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
         catch (Exception ex)
@@ -48,142 +25,246 @@ public class DatabaseConnection
             MessageBox.Show("Database Connection Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
+}
 
-    public void Insert(TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
+
+-- Dashboard --
+using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Windows.Forms;
+
+namespace EmployeeManagement
+{
+    public partial class Form1 : Form
     {
-        try
-        {
-            ConnectDB();
-            string query = "INSERT INTO users(name, username, age) VALUES(@name, @username, @age)";
-            cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@name", nameTxt.Text);
-            cmd.Parameters.AddWithValue("@username", usernameTxt.Text);
-            cmd.Parameters.AddWithValue("@age", ageTxt.Text);
-            cmd.ExecuteNonQuery();
+        private string id = "";
+        private SqlTransaction transaction = null;
 
-            MessageBox.Show("User was added", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            conn.Close();
-            GetAllData(dgvUsers);
-        }
-        catch (Exception ex)
+        public Form1()
         {
-            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            InitializeComponent();
         }
-    }
 
-    public void GetAllData(DataGridView dgvUsers)
-    {
-        try
+        private void Clear()
         {
-            ConnectDB();
-            string query = "SELECT * FROM users";
-            cmd = new MySqlCommand(query, conn);
-            reader = cmd.ExecuteReader();
-            DataTable dt = new DataTable();
-            dt.Load(reader);
-            dgvUsers.DataSource = dt;
-
-            conn.Close();
+            id = "";
+            txtName.Clear();
+            txtUsername.Clear();
+            txtEmail.Clear();
+            txtAge.Clear();
+            txtPassword.Clear();
+            txtSearch.Clear();
+            get_all_user();
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
 
-    public void ShowUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt)
-    {
-        try
+        private void get_all_user()
         {
-            if (string.IsNullOrWhiteSpace(idTxt.Text))
+            try
             {
-                MessageBox.Show("Please enter a valid ID.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Database.db_connect();
+                dgvUsers.Rows.Clear();
+
+                string query = "SELECT * FROM users;";
+                Database.cmd = new SqlCommand(query, Database.conn);
+                Database.reader = Database.cmd.ExecuteReader();
+
+                while (Database.reader.Read())
+                {
+                    dgvUsers.Rows.Add(Database.reader["id"].ToString(),
+                                      Database.reader["name"].ToString(),
+                                      Database.reader["username"].ToString(),
+                                      Database.reader["email"].ToString(),
+                                      Database.reader["age"].ToString(),
+                                      Database.reader["password"].ToString());
+                }
+
+                Database.reader.Close();
+                Database.conn.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            get_all_user();
+        }
+
+        private void saveBtn_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(txtName.Text) || string.IsNullOrEmpty(txtUsername.Text) ||
+                string.IsNullOrEmpty(txtEmail.Text) || string.IsNullOrEmpty(txtAge.Text) ||
+                string.IsNullOrEmpty(txtPassword.Text))
+            {
+                MessageBox.Show("All fields are required!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            else if (!int.TryParse(txtAge.Text, out _))
+            {
+                MessageBox.Show("Age is invalid!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            ConnectDB();
-            string query = "SELECT * FROM users WHERE id = @id";
-            cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@id", idTxt.Text);
-            reader = cmd.ExecuteReader();
-
-            if (reader.Read())
+            try
             {
-                nameTxt.Text = reader["name"].ToString();
-                usernameTxt.Text = reader["username"].ToString();
-                ageTxt.Text = reader["age"].ToString();
+                Database.db_connect();
+                transaction = Database.conn.BeginTransaction();
+
+                string query = "INSERT INTO users (name, username, email, age, password) VALUES (@name, @username, @email, @age, @password); SELECT SCOPE_IDENTITY();";
+                Database.cmd = new SqlCommand(query, Database.conn, transaction);
+                Database.cmd.Parameters.AddWithValue("@name", txtName.Text);
+                Database.cmd.Parameters.AddWithValue("@username", txtUsername.Text);
+                Database.cmd.Parameters.AddWithValue("@email", txtEmail.Text);
+                Database.cmd.Parameters.AddWithValue("@age", txtAge.Text);
+                Database.cmd.Parameters.AddWithValue("@password", txtPassword.Text);
+
+                Database.cmd.ExecuteNonQuery();
+                transaction.Commit();
+
+                MessageBox.Show("User was added.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Database.conn.Close();
+                Clear();
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("User ID does not exist", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                transaction.Rollback();
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
-            reader.Close();
-            conn.Close();
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
 
-    public void DeleteUser(TextBox idTxt, DataGridView dgvUsers)
-    {
-        try
+        private void deleteBtn_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(idTxt.Text))
+            if (string.IsNullOrEmpty(id))
             {
-                MessageBox.Show("Please enter a valid ID.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("User ID is invalid.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            DialogResult result = MessageBox.Show("Are you sure?", "Confirm Deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            var result = MessageBox.Show("Are you sure you want to delete this user?", "Confirm Deletion", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
-            if (result == DialogResult.Yes)
+            if (result == DialogResult.No) return;
+
+            try
             {
-                ConnectDB();
-                string query = "DELETE FROM users WHERE id = @id";
-                cmd = new MySqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@id", idTxt.Text);
-                cmd.ExecuteNonQuery();
-
+                Database.db_connect();
+                string query = "DELETE FROM users WHERE id=@id";
+                Database.cmd = new SqlCommand(query, Database.conn);
+                Database.cmd.Parameters.AddWithValue("@id", id);
+                Database.cmd.ExecuteNonQuery();
                 MessageBox.Show("User was deleted.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                conn.Close();
-                GetAllData(dgvUsers);
+                Database.conn.Close();
+                Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
     }
+}
 
-    public void UpdateUser(TextBox idTxt, TextBox nameTxt, TextBox usernameTxt, TextBox ageTxt, DataGridView dgvUsers)
+
+-- Login --
+using System;
+using System.Data.SqlClient;
+using System.Windows.Forms;
+
+namespace EmployeeManagement
+{
+    public partial class LoginForm : Form
     {
-        try
+        public LoginForm()
         {
-            if (string.IsNullOrWhiteSpace(idTxt.Text))
+            InitializeComponent();
+        }
+
+        private void signinBtn_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(signinUsername.Text) || string.IsNullOrEmpty(signinPassword.Text))
             {
-                MessageBox.Show("Please enter a valid ID.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("All fields are required!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            ConnectDB();
-            string query = "UPDATE users SET name = @name, username = @username, age = @age WHERE id = @id";
-            cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@id", idTxt.Text);
-            cmd.Parameters.AddWithValue("@name", nameTxt.Text);
-            cmd.Parameters.AddWithValue("@username", usernameTxt.Text);
-            cmd.Parameters.AddWithValue("@age", ageTxt.Text);
-            cmd.ExecuteNonQuery();
+            try
+            {
+                Database.db_connect();
+                string query = "SELECT username, password FROM users WHERE username = @username AND password = @password";
+                Database.cmd = new SqlCommand(query, Database.conn);
+                Database.cmd.Parameters.AddWithValue("@username", signinUsername.Text);
+                Database.cmd.Parameters.AddWithValue("@password", signinPassword.Text);
+                Database.reader = Database.cmd.ExecuteReader();
 
-            MessageBox.Show("User was updated.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            conn.Close();
-            GetAllData(dgvUsers);
+                if (Database.reader.HasRows)
+                {
+                    MessageBox.Show("Login successful", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Form1 dashboard = new Form1();
+                    dashboard.Show();
+                    this.Hide();
+                }
+                else
+                {
+                    MessageBox.Show("Invalid username or password", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
+                Database.reader.Close();
+                Database.conn.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
-        catch (Exception ex)
+    }
+}
+
+-- Register --
+using System;
+using System.Data.SqlClient;
+using System.Windows.Forms;
+
+namespace EmployeeManagement
+{
+    public partial class RegisterForm : Form
+    {
+        public RegisterForm()
         {
-            MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            InitializeComponent();
+        }
+
+        private void signupBtn_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(signupUsername.Text) ||
+                string.IsNullOrEmpty(signupPassword.Text) ||
+                string.IsNullOrEmpty(signupCPassword.Text))
+            {
+                MessageBox.Show("All fields are required!", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            else if (signupPassword.Text != signupCPassword.Text)
+            {
+                MessageBox.Show("Passwords do not match. Please try again.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                Database.db_connect();
+                string query = "INSERT INTO users (username, password) VALUES (@username, @password)";
+                Database.cmd = new SqlCommand(query, Database.conn);
+                Database.cmd.Parameters.AddWithValue("@username", signupUsername.Text);
+                Database.cmd.Parameters.AddWithValue("@password", signupPassword.Text);
+                Database.cmd.ExecuteNonQuery();
+                MessageBox.Show("User was added.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Database.conn.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
